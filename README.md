@@ -1,12 +1,11 @@
 # Ludwig Chess
 
-Standard online chess with a live advantage bar on the side. Today the bar shows
-the **material balance**; a full **Stockfish** evaluation that runs entirely in
-your browser is the next slice. Once the engine is in, a strong move tips the bar
-your way and a blunder makes it swing, though it never tells you why.
+Standard online chess with a live **Stockfish** evaluation bar on the side, running
+entirely in your browser. A strong move tips the bar your way and a blunder makes it
+swing, though it never tells you why.
 
-> **Standard online chess with a material advantage bar today. A Stockfish-powered
-> evaluation is coming next.**
+> **Standard online chess. The eval bar shows who is winning. It does not explain
+> the move.**
 
 ## Architecture
 
@@ -15,8 +14,9 @@ Real-time, two-player, no-login online multiplayer:
 - **Server:** Bun + Hono + WebSockets, in-memory and server-authoritative (no DB,
   no login). chess.js is the single rules authority.
 - **Frontend:** React 19 + Vite + Tailwind. Renders from the authoritative FEN.
-- **Engine:** single-threaded Stockfish-WASM in a Web Worker, client-side only
-  (added in a later slice).
+- **Engine:** single-threaded Stockfish-WASM (Stockfish.js, GPLv3) in a Web Worker,
+  client-side only. Assets are copied from the npm package at dev/build time (see
+  scripts/copy-engine.mjs), not committed.
 - **Deploy:** fly.io, a single machine (in-memory state, never scale past one).
 
 Architecture and conventions mirror the round-trip-chess / rps-roulette projects.

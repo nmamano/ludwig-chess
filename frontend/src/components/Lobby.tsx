@@ -51,7 +51,7 @@ export function Lobby({ onCreate, onJoin, initialCode, error, busy }: Props) {
           Ludwig <span className="text-primary">Chess</span>
         </h1>
         <p className="max-w-md font-sans text-base font-semibold leading-relaxed text-pretty text-muted-foreground">
-          Standard online chess with a live material advantage bar on the side. Free, no signup,
+          Standard online chess with a live Stockfish evaluation bar on the side. Free, no signup,
           share a code to play a friend.
         </p>
       </div>

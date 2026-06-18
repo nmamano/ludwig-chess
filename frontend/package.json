@@ -4,14 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "bun ../scripts/copy-engine.mjs && vite",
+    "build": "bun ../scripts/copy-engine.mjs && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "chess.js": "^1.4.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "stockfish": "^18.0.8"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.6",

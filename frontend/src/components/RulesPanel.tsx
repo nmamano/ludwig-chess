@@ -1,10 +1,10 @@
-// Rules copy for Ludwig chess: standard online chess.
+// Rules copy for Ludwig chess: standard online chess with a live engine eval bar.
 
 const RULES = [
   "Standard chess. Checkmate the opponent's king to win.",
   "Castling, en passant, and pawn promotion all work as normal.",
   "Draws: stalemate, threefold repetition, the fifty-move rule, or insufficient material.",
-  "The side bar shows the material balance, not a full engine evaluation.",
+  "The side bar is a live Stockfish evaluation: a blunder makes it swing, but it never tells you why.",
   "Share the 4-letter room code with a friend to play.",
 ];
 
@@ -22,6 +22,27 @@ export function RulesPanel() {
           </li>
         ))}
       </ul>
+      <p className="mt-4 text-xs text-muted-foreground">
+        Evaluation by{" "}
+        <a
+          href="https://github.com/nmrugg/stockfish.js"
+          target="_blank"
+          rel="noreferrer"
+          className="underline hover:text-foreground"
+        >
+          Stockfish.js
+        </a>{" "}
+        (GPLv3), running in your browser. See{" "}
+        <a
+          href="/engine/stockfish-LICENSE.txt"
+          target="_blank"
+          rel="noreferrer"
+          className="underline hover:text-foreground"
+        >
+          license
+        </a>
+        .
+      </p>
     </div>
   );
 }

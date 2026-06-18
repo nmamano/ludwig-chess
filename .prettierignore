@@ -2,6 +2,9 @@
 **/node_modules/
 bun.lock
 
+# generated/vendored engine assets (copied from the stockfish package)
+frontend/public/engine/
+
 # Pre-existing spec docs — owned by Nil, left as-authored.
 HANDOFF.md
 PROMPT.md

@@ -111,8 +111,8 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
 - [x] 1a Fork to standard chess (chess.js source of truth, single board, full
       rules + all draws, online 2-player, rebrand). baseline 51334dd
 - [x] 1b Static eval-bar UI (side panel, dummy value, layout + mobile). baseline 266d079
-- [ ] 1c Stockfish-WASM integration (worker, 1s/move, updating state, live
-      refine, white-relative cp, mate display, evidence surface)
+- [x] 1c Stockfish-WASM integration (worker, 1s/move, updating state, live
+      refine, white-relative cp, mate display, evidence surface). baseline 43c00c3
 - [ ] 1d Deploy to ludwig.nilmamano.com (new GitHub repo, fly app, custom
       domain, OG tags)
 - [ ] OPT numeric/mate edge polish
@@ -304,7 +304,86 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
 
 ## SLICE-1c PICKUP
 
-Authored after 1b commits.
+- Baseline: 43c00c3 (slice 1b committed; `bun run ci` 49 tests + `bun run gate:e2e`
+  20 checks both green).
+- What 1b taught (fold in):
+  - App is the SINGLE eval producer: it derives one `LudwigEvalDebug` and both
+    publishes it (publishEval) and passes it to Game as `evalState`. Game and
+    EvalBar only render it. So 1c changes ONLY App's producer block: replace the
+    material `useMemo` with engine-driven `useState` + an effect. Do not touch
+    EvalBar, Game, debug.ts, or the gate's shape/correlation assertions beyond
+    swapping source-specific expectations.
+  - The contract is `LudwigEvalDebug { source, fen, whiteCp, mate, depth, updating,
+fillPct, label }`. 1c sets source='stockfish', makes depth and updating live,
+    and uses mate when the engine reports it. `fen` still correlates the eval to
+    the authoritative position; App must IGNORE engine results whose fen != the
+    current snapshot.fen (stale-eval guard).
+  - `evalToBar` already takes a discriminated input ({kind:'cp'|'mate'}); feed it
+    {kind:'mate',mate} for mate scores, {kind:'cp',whiteCp} otherwise.
+  - Phase 2 proved the engine: npm `stockfish` 18.0.8, flavor
+    stockfish-18-lite-single (.js + .wasm, approx 7MB, single-threaded, no
+    COOP/COEP). Worker protocol: postMessage UCI strings, onmessage UCI lines;
+    wait for `uciok` then `readyok` before `go`; `position fen <fen>` then
+    `go movetime 1000`; parse `info ... score cp|mate N` and `bestmove`. The
+    /tmp probe harness is the template.
+  - material.ts and its tests stay (proven utility) but App stops importing it; the
+    bar shows `updating` until the engine's first result rather than falling back
+    to material (keep ONE source).
+- Goal: replace the dummy material source with a real client-side single-threaded
+  Stockfish-WASM engine. After every move, each client's engine evaluates the new
+  position at `go movetime 1000`, the bar shows `updating` while it thinks and
+  refines live as depth grows, and the white-relative cp/mate drives the bar and
+  `window.__ludwigEval`. Demoable: blunder a queen and watch the bar crater; the
+  drop is read from the engine's own cp on the evidence surface, not pixels.
+- Load-bearing mechanics / traps:
+  - UCI `score cp`/`score mate` is from the SIDE-TO-MOVE perspective. Convert to
+    white-relative: negate when the fen's side to move is black. Mate likewise.
+    Unit-test this conversion (pure function) plus the info-line parser.
+  - Engine module frontend/src/lib/engine.ts wraps the Worker. API shape:
+    analyze(fen) supersedes any running analysis and emits onEval({ fen, whiteCp,
+    mate, depth, updating }) on info lines and on bestmove (updating=false). EVERY
+    emit carries the fen it was computed for so App can drop stale results. New
+    position while analyzing: send `stop`, then `position fen`+`go` (serialize, or
+    tag by fen and ignore stale). Wait for uciok/readyok before the first go.
+  - Engine file delivery: copy stockfish-18-lite-single.{js,wasm} from
+    node_modules/stockfish/bin into frontend/public/engine/ via a small build step
+    (gitignore frontend/public/engine so the 7MB wasm is not committed; vite copies
+    public/ into dist/). `new Worker('/engine/stockfish-18-lite-single.js')`; the
+    worker resolves the .wasm relative to its own URL (same dir). Add `stockfish`
+    to frontend deps.
+  - Lazy-load the engine once the game is active (avoid 7MB on the lobby). One
+    engine instance per app lifetime; terminate on unmount.
+  - Terminal positions (snapshot.result != null) and the waiting snapshot: do NOT
+    call the engine (a mated position yields `bestmove (none)`); short-circuit to a
+    sensible eval (win -> pin to the winner via a mate-style value; draw -> even),
+    updating=false.
+  - On a new move: set updating=true immediately (keep the last fillPct so the bar
+    does not jump to 50), then let the engine refine.
+  - Each client runs its OWN engine: evals are advisory and may differ slightly at
+    the 1s cutoff. Do NOT assert cross-client EXACT equality for engine evals
+    (unlike the deterministic material eval); assert shape, direction, and rough
+    agreement only.
+- Acceptance criteria:
+  - `bun run ci` green; new unit tests for the white-relative conversion and the
+    info-line parser (pure functions extracted from the engine module).
+  - `bun run gate:e2e` green with the real engine: after connect, source becomes
+    'stockfish', depth becomes a finite number, updating transitions true then
+    false, start-position whiteCp is small (roughly [-150,150]). A scripted BLUNDER
+    (e.g. hang the queen) makes the blundering side's white-relative cp move sharply
+    in the opponent's favor, read from `window.__ludwigEval.whiteCp` (the engine's
+    own output), past a safe threshold (e.g. >= 300 cp swing). Generous timeouts for
+    engine load (7MB) and the 1s think.
+- Decide-with-reviewer: engine file delivery (copy-at-build + gitignore vs commit);
+  the supersede/stale-fen approach; terminal-position short-circuit; the exact
+  blunder line and cp-swing threshold; dropping cross-client exact-equality for
+  engine evals; updating-transition assertion method; movetime 1000 (locked by Nil).
+- Locked (do not relitigate): the engine is frontend-only, single-threaded
+  lite-single, no COOP/COEP; 1s think; only App's producer changes; judge via the
+  engine's own cp on the evidence surface, never pixels; single fly machine; no em
+  dashes; $0 budget (local wasm, free).
+- Resources: the Phase 2 probe (/tmp/sf-probe template), frontend/src/lib/debug.ts
+  (contract), frontend/src/lib/evalbar.ts (mapping), App.tsx (the only producer to
+  change), tests/e2e/gate.mjs (extend), node_modules/stockfish/bin (engine files).
 
 ## SLICE-1d PICKUP
 

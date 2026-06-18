@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Lobby } from "@/components/Lobby";
 import { Waiting } from "@/components/Waiting";
 import { Game } from "@/components/Game";
 import { Net, type Status } from "@/net/socket";
 import { publishDebug, publishError, publishEval, type LudwigEvalDebug } from "@/lib/debug";
-import { materialEvalCp } from "@/lib/material";
 import { evalToBar } from "@/lib/evalbar";
+import { createStockfishEngine, type EngineEval, type EngineHandle } from "@/lib/engine";
 import type { Square, PromotionPiece } from "@shared/chess";
 import type { PlayerId, RoomSnapshot, ServerMsg } from "@shared/protocol";
 
@@ -51,6 +51,35 @@ function clearRoomParam() {
   }
 }
 
+// Terminal positions have no engine search: map the game result straight to the
+// bar. Draw -> even; White win -> positive mate pin; Black win -> negative pin.
+function terminalEval(snapshot: RoomSnapshot): LudwigEvalDebug {
+  const r = snapshot.result;
+  if (!r || r.kind === "draw") {
+    return {
+      source: "stockfish",
+      fen: snapshot.fen,
+      whiteCp: 0,
+      mate: null,
+      depth: null,
+      updating: false,
+      fillPct: 50,
+      label: "0.0",
+    };
+  }
+  const white = r.winner === "white";
+  return {
+    source: "stockfish",
+    fen: snapshot.fen,
+    whiteCp: null,
+    mate: white ? 1 : -1,
+    depth: null,
+    updating: false,
+    fillPct: white ? 99 : 1,
+    label: white ? "1-0" : "0-1",
+  };
+}
+
 export function App() {
   const [status, setStatus] = useState<Status>("connecting");
   const [you, setYou] = useState<PlayerId | null>(null);
@@ -62,29 +91,99 @@ export function App() {
   const netRef = useRef<Net | null>(null);
   const urlRoom = roomFromUrl();
 
-  // The SINGLE eval producer. Material-derived in slice 1b; slice 1c replaces only
-  // this block (Stockfish state) without touching Game, EvalBar, or the publisher.
-  // The same object is both published to the evidence surface and passed to Game,
-  // so the visible bar and window.__ludwigEval can never diverge.
-  const evalState = useMemo<LudwigEvalDebug | null>(() => {
-    if (!snapshot) return null;
-    const cp = materialEvalCp(snapshot.fen);
-    const bar = evalToBar({ kind: "cp", whiteCp: cp });
-    return {
-      source: "material",
+  // ---- The SINGLE eval producer (slice 1c: client-side Stockfish) ----
+  // Only this block changed from slice 1b: the source swapped from material to a
+  // real engine. Game, EvalBar, the LudwigEvalDebug contract, and the publisher are
+  // untouched. The same evalState object is published to window.__ludwigEval AND
+  // passed to Game, so the visible bar and the evidence surface can never diverge.
+  const [evalState, setEvalState] = useState<LudwigEvalDebug | null>(null);
+  const engineRef = useRef<EngineHandle | null>(null);
+  const fenRef = useRef<string | null>(null); // current authoritative FEN (stale guard)
+  const lastBarRef = useRef<{ fillPct: number; label: string }>({ fillPct: 50, label: "0.0" });
+  const analyzedKeyRef = useRef<string | null>(null); // fen + lifecycle; ignores presence-only changes
+
+  // Engine results: drop stale-FEN output, map score -> bar, merge into evalState.
+  const onEngineEval = useCallback((e: EngineEval) => {
+    if (e.fen !== fenRef.current) return; // belongs to a superseded position
+    setEvalState(() => {
+      let fillPct: number;
+      let label: string;
+      if (e.whiteCp != null) {
+        ({ fillPct, label } = evalToBar({ kind: "cp", whiteCp: e.whiteCp }));
+      } else if (e.mate != null) {
+        ({ fillPct, label } = evalToBar({ kind: "mate", mate: e.mate }));
+      } else if (e.updating) {
+        // No score yet: hold the prior bar (do not snap to 50).
+        ({ fillPct, label } = lastBarRef.current);
+      } else {
+        // Failed / no score, not updating: finite neutral bar.
+        fillPct = 50;
+        label = "0.0";
+      }
+      lastBarRef.current = { fillPct, label };
+      return {
+        source: "stockfish",
+        fen: e.fen,
+        whiteCp: e.whiteCp,
+        mate: e.mate,
+        depth: e.depth,
+        updating: e.updating,
+        fillPct,
+        label,
+      };
+    });
+  }, []);
+
+  // React to authoritative FEN changes: terminal/waiting short-circuit; otherwise
+  // hold the prior bar, mark updating, and (lazily) kick the engine.
+  useEffect(() => {
+    fenRef.current = snapshot ? snapshot.fen : null;
+
+    // Presence-only broadcasts (a player connects/disconnects/joins) re-send the
+    // SAME position. Key the analysis lifecycle to fen + waiting/terminal state so
+    // room-metadata changes never restart the engine or reset the bar to updating.
+    const key = snapshot
+      ? `${snapshot.lobby}|${snapshot.result ? "over" : "live"}|${snapshot.fen}`
+      : null;
+    if (key === analyzedKeyRef.current) return;
+    analyzedKeyRef.current = key;
+
+    if (!snapshot || snapshot.lobby === "waiting") {
+      lastBarRef.current = { fillPct: 50, label: "0.0" };
+      setEvalState(null);
+      return;
+    }
+    if (snapshot.result) {
+      const term = terminalEval(snapshot);
+      lastBarRef.current = { fillPct: term.fillPct, label: term.label };
+      setEvalState(term);
+      return; // a finished game has no search; do not call the engine
+    }
+    const hold = lastBarRef.current;
+    setEvalState({
+      source: "stockfish",
       fen: snapshot.fen,
-      whiteCp: cp,
+      whiteCp: null,
       mate: null,
       depth: null,
-      updating: false,
-      fillPct: bar.fillPct,
-      label: bar.label,
-    };
-  }, [snapshot]);
+      updating: true,
+      fillPct: hold.fillPct,
+      label: hold.label,
+    });
+    if (!engineRef.current) engineRef.current = createStockfishEngine(onEngineEval);
+    engineRef.current.analyze(snapshot.fen);
+  }, [snapshot, onEngineEval]);
 
-  // Mirror the authoritative snapshot and the single derived eval onto window for
-  // the gate's evidence surface. Diagnostic only; never read by app logic. evalState
-  // is derived from the SAME snapshot.fen, so __ludwigEval.fen === __ludwig.fen.
+  // Dispose the engine on unmount.
+  useEffect(() => {
+    return () => {
+      engineRef.current?.dispose();
+      engineRef.current = null;
+    };
+  }, []);
+
+  // Mirror the authoritative snapshot and the single eval onto window for the
+  // gate's evidence surface. Diagnostic only; never read by app logic.
   useEffect(() => {
     publishDebug(snapshot, you);
     publishEval(evalState);
