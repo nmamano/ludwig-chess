@@ -48,11 +48,10 @@ export function Lobby({ onCreate, onJoin, initialCode, error, busy }: Props) {
     <main className="relative mx-auto flex min-h-screen w-full max-w-xl flex-col items-center justify-center gap-9 px-6 py-16">
       <div className="flex flex-col items-center gap-3 text-center">
         <h1 className="font-heading text-5xl font-extrabold tracking-tight text-balance sm:text-6xl">
-          Round-Trip <span className="text-primary">Chess</span>
+          Ludwig <span className="text-primary">Chess</span>
         </h1>
         <p className="max-w-md font-sans text-base font-semibold leading-relaxed text-pretty text-muted-foreground">
-          Capture pieces to send them to the other board • Win by capturing the opponent&apos;s king
-          twice.
+          Standard online chess. Free, no signup, share a code to play a friend.
         </p>
       </div>
 

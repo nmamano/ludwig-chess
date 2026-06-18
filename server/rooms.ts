@@ -8,7 +8,7 @@
 
 import { customAlphabet } from "nanoid";
 import { Match, waitingSnapshot, colorOf, type MatchPlayer } from "./match";
-import type { Color } from "../shared/board";
+import type { Color, MoveInput } from "../shared/chess";
 import {
   RECONNECT_GRACE_MS,
   CODE_LENGTH,
@@ -18,7 +18,6 @@ import {
   MAX_NAME_LENGTH,
 } from "../shared/config";
 import type { PlayerId, ServerMsg, RoomSnapshot, ErrorCode } from "../shared/protocol";
-import type { Move } from "../shared/engine";
 
 const genCode = customAlphabet(CODE_ALPHABET, CODE_LENGTH);
 const genToken = customAlphabet(TOKEN_ALPHABET, TOKEN_LENGTH);
@@ -116,23 +115,11 @@ export class Room {
 
   // ---- gameplay ---------------------------------------------------------
 
-  move(pid: PlayerId, move: Move, conn: Connection): void {
+  move(pid: PlayerId, move: MoveInput, conn: Connection): void {
     const slot = this.slots[pid];
     if (!slot || slot.conn !== conn) return; // a replaced/stale socket may not act
     if (!this.match) return;
     const res = this.match.move(pid, move);
-    if (!res.ok) {
-      conn.send({ t: "error", code: res.error.code, message: res.error.message });
-      return;
-    }
-    this.broadcast();
-  }
-
-  place(pid: PlayerId, square: number, conn: Connection): void {
-    const slot = this.slots[pid];
-    if (!slot || slot.conn !== conn) return;
-    if (!this.match) return;
-    const res = this.match.place(pid, square);
     if (!res.ok) {
       conn.send({ t: "error", code: res.error.code, message: res.error.message });
       return;

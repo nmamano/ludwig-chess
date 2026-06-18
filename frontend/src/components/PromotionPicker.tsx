@@ -1,9 +1,14 @@
-import type { Color } from "@shared/board";
-import type { PromotionPiece } from "@shared/engine";
+import type { Color, PromotionPiece } from "@shared/chess";
 import { PieceGlyph } from "@/components/PieceGlyph";
 
-// Queen-first, matching the engine's conventional default ordering.
-const ORDER: PromotionPiece[] = ["queen", "rook", "bishop", "knight"];
+// Queen-first, the conventional default ordering.
+const ORDER: PromotionPiece[] = ["q", "r", "b", "n"];
+const NAME: Record<PromotionPiece, string> = {
+  q: "queen",
+  r: "rook",
+  b: "bishop",
+  n: "knight",
+};
 
 interface Props {
   color: Color;
@@ -21,7 +26,7 @@ export function PromotionPicker({ color, onChoose, onCancel }: Props) {
         className="w-full max-w-xs rounded-3xl border-2 border-border bg-card p-6 text-center shadow-[0_8px_0_0_var(--border)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="font-heading text-lg font-extrabold">Promote to…</div>
+        <div className="font-heading text-lg font-extrabold">Promote to...</div>
         <div className="mt-4 grid grid-cols-4 gap-2">
           {ORDER.map((p) => (
             <button
@@ -29,7 +34,7 @@ export function PromotionPicker({ color, onChoose, onCancel }: Props) {
               type="button"
               onClick={() => onChoose(p)}
               className="flex aspect-square items-center justify-center rounded-2xl border-2 border-border bg-background text-3xl transition-colors hover:border-primary hover:bg-muted"
-              aria-label={`Promote to ${p}`}
+              aria-label={`Promote to ${NAME[p]}`}
             >
               <PieceGlyph type={p} color={color} />
             </button>

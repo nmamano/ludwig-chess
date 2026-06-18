@@ -1,5 +1,5 @@
 {
-  "name": "round-trip-chess-frontend",
+  "name": "ludwig-chess-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "chess.js": "^1.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

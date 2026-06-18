@@ -1,11 +1,10 @@
-// Rules copy: verbatim from PROMPT.md §6 (the bottom "Rules" info panel).
+// Rules copy for Ludwig chess: standard online chess.
 
 const RULES = [
-  "Each turn, move a piece on either board (your choice, not both)",
-  "Captured pieces move to the other board – you place them on valid starting positions",
-  "Chain reaction: placing on an occupied square captures that piece too (even your own!)",
-  "Win by capturing the opponent's king on BOTH boards (round-trip)",
-  "No checkmate – you must actually capture the king",
+  "Standard chess. Checkmate the opponent's king to win.",
+  "Castling, en passant, and pawn promotion all work as normal.",
+  "Draws: stalemate, threefold repetition, the fifty-move rule, or insufficient material.",
+  "Share the 4-letter room code with a friend to play.",
 ];
 
 export function RulesPanel() {

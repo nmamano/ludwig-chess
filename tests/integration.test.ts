@@ -1,12 +1,13 @@
 // End-to-end integration over a real WebSocket against the actual server, booted
 // in-process on an ephemeral port. Covers the highest-risk wire behaviors:
-// create/join, a server-validated move broadcast, out-of-turn rejection, the
-// capture→placement chain, reconnect-by-token, opponent-left, and join errors.
+// create/join, a server-validated move broadcast, out-of-turn and illegal-move
+// rejection, malformed payloads, a scripted checkmate, reconnect-by-token (FEN
+// preserved), opponent-left, and join errors.
 
 import { test, expect, describe, beforeAll, afterAll } from "bun:test";
+import { Chess } from "chess.js";
 import app from "../server/index.ts";
 import type { ClientMsg, ServerMsg } from "../shared/protocol";
-import { sq } from "./helpers";
 
 type OfType<K extends ServerMsg["t"]> = Extract<ServerMsg, { t: K }>;
 
@@ -104,6 +105,7 @@ describe("integration (real WS)", () => {
     const s = p1.last("state")!;
     expect(s.state.lobby).toBe("active");
     expect(s.state.turn).toBe("white");
+    expect(s.state.result).toBeNull();
     expect(s.state.players.find((p) => p.id === "p2")?.name).toBe("Bob");
     p1.close();
     p2.close();
@@ -111,59 +113,70 @@ describe("integration (real WS)", () => {
 
   test("a move is validated server-side and broadcast to both players", async () => {
     const { p1, p2 } = await startGame();
-    p1.send({ t: "move", board: 0, from: sq("e2"), to: sq("e4") });
+    p1.send({ t: "move", from: "e2", to: "e4" });
     const after1 = await p1.waitFor("state", (m) => m.state.turn === "black");
     const after2 = await p2.waitFor("state", (m) => m.state.turn === "black");
-    expect(after1.state.boards[0][sq("e4")]).toEqual({ type: "pawn", color: "white" });
-    expect(after2.state.boards[0][sq("e2")]).toBeNull();
+    expect(after1.state.lastMove).toEqual({ from: "e2", to: "e4" });
+    expect(new Chess(after2.state.fen).get("e4")).toMatchObject({ type: "p", color: "w" });
     p1.close();
     p2.close();
   });
 
   test("acting out of turn is rejected as not_your_turn", async () => {
     const { p1, p2 } = await startGame();
-    p2.send({ t: "move", board: 0, from: sq("d7"), to: sq("d5") }); // Black tries to move first
+    p2.send({ t: "move", from: "d7", to: "d5" }); // Black tries to move first
     const err = await p2.waitFor("error");
     expect(err.code).toBe("not_your_turn");
     p1.close();
     p2.close();
   });
 
-  test("capture → placement chain resolves over the wire (and never leaks pending.visited)", async () => {
+  test("an illegal move is rejected and the authoritative FEN is unchanged", async () => {
     const { p1, p2 } = await startGame();
-    p1.send({ t: "move", board: 0, from: sq("e2"), to: sq("e4") });
-    await p2.waitFor("state", (m) => m.state.turn === "black");
-    p2.send({ t: "move", board: 0, from: sq("d7"), to: sq("d5") });
-    await p1.waitFor("state", (m) => m.state.turn === "white");
-
-    p1.send({ t: "move", board: 0, from: sq("e4"), to: sq("d5") }); // capture
-    const pending = await p1.waitFor("state", (m) => m.state.phase.kind === "awaitingPlacement");
-    const phase = pending.state.phase;
-    expect(phase.kind).toBe("awaitingPlacement");
-    if (phase.kind === "awaitingPlacement") {
-      expect(phase.piece).toEqual({ type: "pawn", color: "black" });
-      expect(phase.board).toBe(1);
-      expect(phase.options).toContain(sq("a7"));
-    }
-
-    p1.send({ t: "place", square: sq("a7") });
-    // Wait specifically for the post-placement state (the captured pawn lands on
-    // board 1) — `awaitingMove && turn black` alone also matches White's earlier
-    // first move, before any capture.
-    const resolved = await p1.waitFor("state", (m) => m.state.boards[1][sq("a7")] !== null);
-    expect(resolved.state.phase.kind).toBe("awaitingMove");
-    expect(resolved.state.turn).toBe("black");
-    expect(resolved.state.boards[1][sq("a7")]).toEqual({ type: "pawn", color: "black" });
-
-    // Perfect-information boundary: no state ever serialized internal chain metadata.
-    expect(p1.states().every((m) => !JSON.stringify(m.state).includes("visited"))).toBe(true);
-    expect(p2.states().every((m) => !JSON.stringify(m.state).includes("visited"))).toBe(true);
+    const before = p1.last("state")!.state.fen;
+    p1.send({ t: "move", from: "e2", to: "e5" }); // pawn cannot jump three
+    const err = await p1.waitFor("error");
+    expect(err.code).toBe("illegal_move");
+    expect(p1.last("state")!.state.fen).toBe(before);
     p1.close();
     p2.close();
   });
 
-  test("reconnect by token reclaims the slot; bad token is rejected", async () => {
+  test("a malformed move payload is rejected as bad_message", async () => {
+    const { p1, p2 } = await startGame();
+    p1.send({ t: "move", from: "e2", to: "z9" } as unknown as ClientMsg);
+    expect((await p1.waitFor("error")).code).toBe("bad_message");
+    p1.close();
+    p2.close();
+  });
+
+  test("a scripted checkmate ends the game with the right winner and result", async () => {
+    const { p1, p2 } = await startGame();
+    // Wait on the unique lastMove, not the turn color (which oscillates and would
+    // match a stale state already in the inbox).
+    const moved =
+      (from: string, to: string) =>
+      (m: OfType<"state">): boolean =>
+        m.state.lastMove?.from === from && m.state.lastMove?.to === to;
+    // Fool's Mate: 1. f3 e5 2. g4 Qh4#
+    p1.send({ t: "move", from: "f2", to: "f3" });
+    await p2.waitFor("state", moved("f2", "f3"));
+    p2.send({ t: "move", from: "e7", to: "e5" });
+    await p1.waitFor("state", moved("e7", "e5"));
+    p1.send({ t: "move", from: "g2", to: "g4" });
+    await p2.waitFor("state", moved("g2", "g4"));
+    p2.send({ t: "move", from: "d8", to: "h4" });
+    const end = await p1.waitFor("state", (m) => m.state.result !== null);
+    expect(end.state.result).toEqual({ kind: "win", winner: "black", reason: "checkmate" });
+    p1.close();
+    p2.close();
+  });
+
+  test("reconnect by token reclaims the slot and preserves the position; bad token rejected", async () => {
     const { p1, p2, j1 } = await startGame();
+    p1.send({ t: "move", from: "e2", to: "e4" });
+    const moved = await p2.waitFor("state", (m) => m.state.turn === "black");
+    const fen = moved.state.fen;
 
     p1.close();
     await p2.waitFor(
@@ -177,16 +190,12 @@ describe("integration (real WS)", () => {
     const rejoined = await p1b.waitFor("joined");
     expect(rejoined.you).toBe("p1");
     expect(rejoined.color).toBe("white");
-    await p2.waitFor(
-      "state",
-      (m) => m.state.players.find((p) => p.id === "p1")?.connected === true,
-    );
+    expect(rejoined.state.fen).toBe(fen); // position preserved across reconnect
 
     const intruder = client();
     await intruder.opened();
     intruder.send({ t: "reconnect", code: j1.code, token: "not-a-real-token" });
-    const err = await intruder.waitFor("error");
-    expect(err.code).toBe("bad_token");
+    expect((await intruder.waitFor("error")).code).toBe("bad_token");
 
     p1b.close();
     p2.close();

@@ -21,8 +21,8 @@ run gates -> Game Reviewer DIFF-GATE (review the diff before commit) -> sign-off
 - Every message to the reviewer MUST instruct it to reply by POSTing back to my
   endpoint. A reply only in its own chat never reaches me. Template:
   curl -s -X POST localhost:4000/agents/agent-1780859223976-0ki7/message \
-    -H 'Content-Type: application/json' \
-    -d '{"text":"...","senderAgentId":"agent-1780864878869-eq7t"}'
+   -H 'Content-Type: application/json' \
+   -d '{"text":"...","senderAgentId":"agent-1780864878869-eq7t"}'
 - When waiting on the reviewer, end the turn with a ~20-25 min fallback wakeup.
   The reviewer POST is the real wake signal; the wakeup is only a stall guard.
 - Commit only on explicit reviewer sign-off. If the reviewer is unresponsive for
@@ -31,22 +31,24 @@ run gates -> Game Reviewer DIFF-GATE (review the diff before commit) -> sign-off
 ## Gates per slice
 
 Always-run (cheap, deterministic, every slice):
+
 - `bun run ci` (root) = prettier --check + eslint + tsc (root + frontend) +
   `bun test tests/` + vite build. Must be green before any commit.
 
 Gated browser smoke (from slice 1b onward; drives real system Chrome):
+
 - `bun run gate:e2e` (to be created in 1a/1b). Builds the frontend, starts ONE
   isolated server on reserved port 39280 (in-memory state, fresh process), drives
   headless system Chrome via playwright-core (channel:'chrome',
   args --no-sandbox --disable-dev-shm-usage --disable-gpu).
 - Judge via the evidence surface, never the DOM/pixels:
   - server RoomSnapshot (authoritative fen / turn / result), and
-  - client window.__ludwig ({ fen, turn, result }) and
-    window.__ludwigEval ({ whiteCp, mate, depth, updating, fen }).
-- 1a check: two clients connect, moves reflected (compare window.__ludwig.fen to
+  - client `window.__ludwig` ({ fen, turn, result }) and
+    `window.__ludwigEval` ({ whiteCp, mate, depth, updating, fen }).
+- 1a check: two clients connect, moves reflected (compare `window.__ludwig.fen` to
   server truth), scripted checkmate yields gameOver=win in the snapshot, illegal
   move rejected.
-- 1c check: blunder a queen, poll window.__ludwigEval; assert white-relative cp
+- 1c check: blunder a queen, poll `window.__ludwigEval`; assert white-relative cp
   drops past a threshold, and "updating" appears then clears.
 - Screenshots are evidence artifacts only, never assertions.
 
@@ -106,17 +108,17 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
 
 ## Slice plan
 
-- [ ] 1a  Fork to standard chess (chess.js source of truth, single board, full
-          rules + all draws, online 2-player, rebrand). baseline 51334dd
-- [ ] 1b  Static eval-bar UI (side panel, dummy value, layout + mobile)
-- [ ] 1c  Stockfish-WASM integration (worker, 1s/move, updating state, live
-          refine, white-relative cp, mate display, evidence surface)
-- [ ] 1d  Deploy to ludwig.nilmamano.com (new GitHub repo, fly app, custom
-          domain, OG tags)
-- [ ] OPT  numeric/mate edge polish
-- [ ] OPT  eval history sparkline
-- [ ] OPT  multi-threaded engine upgrade (needs COOP/COEP headers)
-- [ ] OPT  mobile layout polish
+- [x] 1a Fork to standard chess (chess.js source of truth, single board, full
+      rules + all draws, online 2-player, rebrand). baseline 51334dd
+- [ ] 1b Static eval-bar UI (side panel, dummy value, layout + mobile)
+- [ ] 1c Stockfish-WASM integration (worker, 1s/move, updating state, live
+      refine, white-relative cp, mate display, evidence surface)
+- [ ] 1d Deploy to ludwig.nilmamano.com (new GitHub repo, fly app, custom
+      domain, OG tags)
+- [ ] OPT numeric/mate edge polish
+- [ ] OPT eval history sparkline
+- [ ] OPT multi-threaded engine upgrade (needs COOP/COEP headers)
+- [ ] OPT mobile layout polish
 
 ## Deferred / parked
 
@@ -150,9 +152,9 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
   channel:'chrome', args --no-sandbox --disable-dev-shm-usage --disable-gpu. gh
   authed as nmamano (scopes repo, workflow). fly authed (~/.fly/bin/fly). Stockfish
   probe PASS: start cp+40, white-up-queen cp+671, approx 1s each, evidence surface
-  readable (window.__results).
-- Evidence surfaces (the oracle): server RoomSnapshot; client window.__ludwig and
-  window.__ludwigEval. Never assert on DOM pixels.
+  readable (`window.__results`).
+- Evidence surfaces (the oracle): server RoomSnapshot; client `window.__ludwig` and
+  `window.__ludwigEval`. Never assert on DOM pixels.
 - House patterns: server reads PORT env; serves built SPA from frontend/dist plus
   /ws and /health; OG/Twitter absolute URLs in frontend/index.html must match the
   deploy origin (update in slice 1d). No em dashes.
@@ -200,7 +202,7 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
   - Frontend: render a single board from chess.js .board() (reconstruct
     new Chess(fen) from the snapshot). Click-to-move with hints from
     .moves({square,verbose:true}). Keep the promotion picker, wired to chess.js
-    promotion. Expose window.__ludwig = { fen, turn, result } for gates.
+    promotion. Expose `window.__ludwig` = { fen, turn, result } for gates.
   - Rebrand: package.json names, SESSION_KEY, header + lobby logos and taglines,
     RulesPanel (standard rules), remove placement/chain/king-capture copy, board
     labels, index.html title/description (OG absolute URLs deferred to 1d). No em
@@ -212,7 +214,7 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
 - Acceptance criteria:
   - `bun run ci` green; no variant references remain (grep clean for round-trip,
     two-board, placement, kingCapture).
-  - e2e gate on port 39280: two clients connect, moves reflected (window.__ludwig.fen
+  - e2e gate on port 39280: two clients connect, moves reflected (`window.__ludwig.fen`
     vs server truth), a scripted checkmate yields gameOver=win in the snapshot, an
     illegal move is rejected. Assertions on the evidence surface, not pixels.
 - Decide-with-reviewer: the new fen-based RoomSnapshot/protocol shape; algebraic vs
@@ -223,7 +225,7 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
 - Resources: the architecture map in this repo's planning context; chess.js docs;
   round-trip files to adapt: server/socket.ts, server/rooms.ts, server/match.ts,
   shared/protocol.ts, shared/board.ts, frontend App.tsx, Game.tsx, Board.tsx,
-  Lobby.tsx, RulesPanel.tsx, tests/*.
+  Lobby.tsx, RulesPanel.tsx, tests/\*.
 
 ## SLICE-1b PICKUP
 

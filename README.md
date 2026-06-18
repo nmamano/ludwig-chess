@@ -1,32 +1,40 @@
-# Round-Trip Chess
+# Ludwig Chess
 
-A two-board chess variant. Play starts like normal chess, but **captured pieces
-aren't removed** — they travel to a **second board**. You win by capturing the
-opponent's king on **both** boards: a "round trip" from the first board to the
-second and back.
+Standard online chess, built to host one twist: a live **evaluation bar** on the
+side, powered by a Stockfish engine that runs entirely in your browser. The board,
+rules, and multiplayer ship first; the eval bar lands in a later slice (see the
+plan linked below). Once it is in, a strong move tips the bar your way and a
+blunder makes it swing, though the engine never tells you why.
 
-> **Capture pieces to send them to the other board • Win by capturing the
-> opponent's king twice.**
+> **Standard online chess today. The eval bar is the headline feature, coming
+> next.**
 
-## Status
+## Architecture
 
-**Design stage — not yet implemented.** This repo currently holds the spec and the
-implementation kickoff. Start here:
+Real-time, two-player, no-login online multiplayer:
 
-- [`PROMPT.md`](./PROMPT.md) — the full game design spec (rules, win condition, the
-  capture→placement→chain mechanic, website copy, open questions).
-- [`HANDOFF.md`](./HANDOFF.md) — the kickoff prompt for the implementing agent.
+- **Server:** Bun + Hono + WebSockets, in-memory and server-authoritative (no DB,
+  no login). chess.js is the single rules authority.
+- **Frontend:** React 19 + Vite + Tailwind. Renders from the authoritative FEN.
+- **Engine:** single-threaded Stockfish-WASM in a Web Worker, client-side only
+  (added in a later slice).
+- **Deploy:** fly.io, a single machine (in-memory state, never scale past one).
 
-## Origin
+Architecture and conventions mirror the round-trip-chess / rps-roulette projects.
 
-The original prototype was built with **v0 (Vercel)** and is **local hotseat only
-(single browser, no multiplayer)**: <https://v0-round-trip-chess-variant.vercel.app/>.
-Its source isn't available (different v0 account), so it serves as a visual/UX
-reference only.
+## Develop
 
-## Planned build
+```
+bun install && (cd frontend && bun install)
+bun run dev                    # server on :3000
+(cd frontend && bun run dev)   # Vite dev server, proxies /ws to :3000
+```
 
-Real-time, two-player, no-login online multiplayer, mirroring the
-[`rps-roulette`](https://github.com/nmamano/rps-roulette) architecture: Bun + Hono +
-WebSockets · React 19 + Vite · a pure shared rules engine · in-memory
-server-authoritative state (no DB, no login) · deployed on fly.io (single machine).
+## Gates
+
+```
+bun run ci         # prettier + eslint + typecheck + bun test + build
+bun run gate:e2e   # dual-client headless-Chrome smoke (reserved port 39280)
+```
+
+The slice-by-slice build is tracked in [`plans/ludwig-chess-loop.md`](./plans/ludwig-chess-loop.md).

@@ -1,4 +1,4 @@
-# fly.toml: Round-Trip Chess
+# fly.toml: Ludwig Chess
 #
 # ⚠️ SINGLE-MACHINE CONSTRAINT (read before scaling):
 # All game state is in-memory in one Bun process. A second machine would hold a
@@ -7,7 +7,7 @@
 # (`fly scale count 1`). In-flight games are lost on machine restart, acceptable
 # and ephemeral by design.
 
-app = 'round-trip-chess'
+app = 'ludwig-chess'
 primary_region = 'sjc'
 
 [build]

@@ -2,45 +2,30 @@
 // socket's binding to a room slot. All game state + broadcasting lives in Room.
 //
 // Boundary validation here is the first line of defense: it rejects structurally
-// malformed payloads (bad board id, non-integer squares, bogus promotion) before
-// they reach Match. The engine remains the FINAL legality authority — anything
-// well-typed but illegal (wrong destination, occupied square, etc.) is rejected
-// downstream and mapped to illegal_move / illegal_placement.
+// malformed payloads (non-square coordinates, bogus promotion) before they reach
+// Match. chess.js remains the FINAL legality authority: anything well-formed but
+// illegal (wrong destination, moving into check, etc.) is mapped to illegal_move.
 
 import { createBunWebSocket } from "hono/bun";
 import type { Hono } from "hono";
 import type { WSContext } from "hono/ws";
 import { type Connection, type Room, RoomStore } from "./rooms";
 import type { ClientMsg, PlayerId } from "../shared/protocol";
-import type { BoardId } from "../shared/board";
-import type { Move, PromotionPiece } from "../shared/engine";
+import { isSquare, isPromotion, type MoveInput } from "../shared/chess";
 
 const { upgradeWebSocket, websocket } = createBunWebSocket();
 
-const isInt = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n);
-const isBoardId = (n: unknown): n is BoardId => n === 0 || n === 1;
-const isPromotion = (p: unknown): p is PromotionPiece =>
-  p === "knight" || p === "bishop" || p === "rook" || p === "queen";
-
-// Validate a `move` payload's shape (not its chess legality — that's the engine's
-// job). Full square-range checks are also the engine's; here we only ensure the
-// values are well-formed enough to hand to Match.
-function parseMove(m: unknown): Move | null {
+// Validate a `move` payload's SHAPE (not its chess legality). from/to must be real
+// a1-h8 squares; promotion, if present, must be q/r/b/n. Anything else is
+// bad_message; chess.js rejects well-formed-but-illegal moves downstream.
+function parseMove(m: unknown): MoveInput | null {
   if (typeof m !== "object" || m === null) return null;
   const r = m as Record<string, unknown>;
-  if (!isBoardId(r.board) || !isInt(r.from) || !isInt(r.to)) return null;
+  if (!isSquare(r.from) || !isSquare(r.to)) return null;
   if (r.promotion !== undefined && !isPromotion(r.promotion)) return null;
-  const move: Move = { board: r.board, from: r.from, to: r.to };
+  const move: MoveInput = { from: r.from, to: r.to };
   if (r.promotion !== undefined) move.promotion = r.promotion;
   return move;
-}
-
-// Validate a `place` payload's shape. The square's RANGE is the engine's job
-// (it range-checks before indexing); here we only ensure it's an integer.
-function parsePlace(m: unknown): number | null {
-  if (typeof m !== "object" || m === null) return null;
-  const square = (m as Record<string, unknown>).square;
-  return isInt(square) ? square : null;
 }
 
 function makeConn(ws: WSContext): Connection {
@@ -170,17 +155,6 @@ export function registerSocket(app: Hono, store: RoomStore) {
               return;
             }
             b.room.move(b.pid, move, conn);
-            return;
-          }
-          case "place": {
-            const b = active();
-            if (!b) return;
-            const square = parsePlace(msg);
-            if (square === null) {
-              conn.send({ t: "error", code: "bad_message", message: "Malformed placement." });
-              return;
-            }
-            b.room.place(b.pid, square, conn);
             return;
           }
           case "newGame": {
