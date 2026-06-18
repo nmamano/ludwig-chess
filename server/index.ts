@@ -1,6 +1,5 @@
 // Hono app: WS upgrade, static serving of the built frontend, Bun default export.
-// In-memory state only — see fly.toml (added in a later slice): this MUST run on
-// exactly one machine.
+// In-memory state only (see fly.toml): this MUST run on exactly one machine.
 
 import { Hono } from "hono";
 import { logger } from "hono/logger";
@@ -19,6 +18,14 @@ const store = new RoomStore();
 const websocket = registerSocket(app, store);
 
 app.get("/health", (c) => c.json({ ok: true, rooms: store.size }));
+
+// Serve the Stockfish wasm worker asset with the correct MIME so the browser can
+// stream-compile it and the content-type is unambiguous behind fly's proxy. Runs
+// before the static catch-all and fixes the header after the file is served.
+app.use("/engine/*", async (c, next) => {
+  await next();
+  if (c.req.path.endsWith(".wasm")) c.header("Content-Type", "application/wasm");
+});
 
 // Serve the built SPA (frontend/dist), falling back to index.html for any route
 // the static handler doesn't resolve. Only meaningful once `bun run build` has

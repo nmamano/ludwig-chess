@@ -2,6 +2,9 @@
 **/node_modules
 **/dist
 /tests
+# Force the image to regenerate engine assets from installed deps (copy-engine),
+# so a clean build proves reproducibility rather than inheriting local files.
+frontend/public/engine
 .dockerignore
 .env
 .env.*

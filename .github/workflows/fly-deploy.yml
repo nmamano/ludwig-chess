@@ -9,6 +9,11 @@ on:
     branches:
       - master
 
+# Least privilege: this workflow only checks out and deploys; it needs no write
+# access to repo contents.
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Deploy app
@@ -16,7 +21,8 @@ jobs:
     concurrency: deploy-group
     steps:
       - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # Pinned to the immutable commit for tag 1.5 rather than the mutable @master.
+      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be # tag 1.5
       - run: flyctl deploy --remote-only --ha=false
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

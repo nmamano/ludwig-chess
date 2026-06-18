@@ -13,7 +13,10 @@
     "lint": "bun x eslint .",
     "typecheck": "bun x tsc --noEmit -p tsconfig.json && bun --cwd=frontend x tsc --noEmit",
     "ci": "bun x prettier --check . && bun x eslint . && bun run typecheck && bun test tests/ && bun run build",
-    "gate:e2e": "bun run build && bun tests/e2e/gate.mjs"
+    "gate:e2e": "bun run build && bun tests/e2e/gate.mjs",
+    "gate:docker": "bun scripts/gate-docker.mjs",
+    "gate:prod": "bun scripts/gate-prod.mjs",
+    "smoke:live": "bun scripts/smoke-live.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

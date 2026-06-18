@@ -122,9 +122,13 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
 
 ## Deferred / parked
 
+- parked-for-Nil: approve the about $2/month fly machine for ludwig-chess (or confirm
+  a legacy free allowance) before any `fly apps create` / `fly deploy`. Reconciles
+  standing rail 5 ($0); the deploy is the one approved exception, pending Nil.
 - parked-for-Nil: flip the GitHub repo to public (default is private).
-- parked-for-Nil: add the DNS record for ludwig.nilmamano.com at the nilmamano.com
-  provider, if I lack access (slice 1d).
+- parked-for-Nil: add the EXACT fly-provided DNS records for ludwig.nilmamano.com
+  (captured from `fly certs add`, not inferred from chess.nilmamano.com) at the
+  nilmamano.com DNS provider (slice 1d; I lack provider access).
 - note: stockfish.js is GPLv3, loaded as a separate UCI worker (not statically
   linked). Add a visible credits/source link in the UI. Flag to Nil if the repo
   license needs to be reconciled.
@@ -387,4 +391,74 @@ fillPct, label }`. 1c sets source='stockfish', makes depth and updating live,
 
 ## SLICE-1d PICKUP
 
-Authored after 1c commits.
+- Baseline: b11187d (slices 1a/1b/1c committed; `bun run ci` 67 tests +
+  `bun run gate:e2e` 17 real-engine checks both green).
+- What 1c taught (fold in):
+  - The engine ships via the build: frontend `build` runs `bun ../scripts/copy-engine.mjs`
+    (bun, not node, so it works in the oven/bun Docker image) then vite, which copies
+    frontend/public/engine into dist/engine. The Dockerfile's
+    `find . ! -regex '^./dist...' -delete` keeps dist/engine. So the wasm is in the
+    image even though it is gitignored in the repo.
+  - The e2e gate already serves the production build through the REAL server
+    (server/index.ts serveStatic) and the engine loads, so engine-from-server is
+    proven; the live smoke confirms it over the network.
+- Goal: deploy Ludwig chess to a public URL. New PRIVATE GitHub repo
+  nmamano/ludwig-chess, new fly app ludwig-chess (slug already set in fly.toml +
+  fly-deploy.yml), single machine, then the custom domain ludwig.nilmamano.com.
+  Demoable: open the live URL on two devices, play a game, watch the Stockfish eval
+  bar update and swing on a blunder.
+- BILLING GUARD (blocks the credentialed phase): a kept-running shared-cpu-1x 256mb
+  fly machine is about $2/month, NOT $0 (free allowances are legacy-org only, and
+  min_machines_running=1 means it does not auto-stop to free). The fly org is
+  personal (Nil M) and already runs 4 such apps. Do NOT run `fly apps create` /
+  `fly deploy` until Nil EXPLICITLY approves the about $2/month or confirms a legacy
+  allowance. This reconciles standing rail 5 ($0): the deploy is the one approved
+  exception, pending Nil.
+- Reviewed decisions (the credentialed-phase handoff; do not relitigate):
+  - OG art is REGENERATED and was BLOCKING: scripts/make-og.mjs produced a
+    Ludwig-branded 2400x1260 frontend/public/og.png (committed). Favicons are
+    icon-only king art, kept as-is. OG/Twitter absolute URLs are finalized to
+    https://ludwig.nilmamano.com in index.html.
+  - Local pre-deploy gate: docker DAEMON IS UNAVAILABLE here (user not in the docker
+    group; sudo needs a password). `bun run gate:prod` is the accepted local
+    substitute (clean-state rebuild proving copy-engine regenerates dist/engine from
+    deps, then production `bun run start` serving the assets 200 + nonzero +
+    application/wasm + /health). `bun run gate:docker` remains for docker-capable
+    environments. The fly --remote-only build (same Dockerfile) plus the live smoke
+    are STILL REQUIRED before the deploy is considered complete.
+  - server/index.ts serves /engine/\*.wasm as application/wasm (middleware). The
+    Dockerfile build runs copy-engine via bun, so the engine ships in dist/engine.
+  - Deploy sequence (least privilege): (a) `fly apps create ludwig-chess`; (b)
+    `fly deploy --ha=false --remote-only` (one machine, remote build); `fly scale
+count 1`; verify EXACTLY ONE machine (`fly status`) + live smoke. (c) Create the
+    PRIVATE repo WITHOUT pushing: `gh repo create nmamano/ludwig-chess --private
+--source=. --remote=origin` (do not pass --push). (d) `fly tokens create deploy`
+    piped DIRECTLY into `gh secret set FLY_API_TOKEN -R nmamano/ludwig-chess`; never
+    print or retain the token. (e) Push master ONLY after the secret exists; the push
+    triggers a second deploy via Actions, which MUST pass; confirm one machine after.
+  - Workflow hardened: `permissions: contents: read`; setup-flyctl pinned to the
+    immutable commit fc53c09 (tag 1.5); keep --ha=false.
+  - Custom domain: `fly certs add ludwig.nilmamano.com` -> capture the EXACT
+    fly-provided records (A/AAAA/CNAME exactly as fly states; do NOT infer from
+    chess.nilmamano.com). PARKED-FOR-NIL: Nil adds them at the nilmamano.com DNS
+    provider (I lack access). The .fly.dev URL is the working product meanwhile.
+  - Credentialed actions run as Nil (pre-authorized 2026-06-18): gh repo create,
+    fly apps create / deploy / certs / tokens, gh secret set, push. Announce each in
+    chat; pipe any token-printing command through a sed redaction; never log the token.
+- Acceptance criteria:
+  - `bun run ci`, `bun run gate:e2e`, `bun run gate:prod` stay green.
+  - fly --remote-only build succeeds; `bun run smoke:live <fly url>` passes
+    (LIVE_SMOKE_PASS): two clients activate a room + one move, one client shows
+    `window.__ludwigEval` source stockfish / updating false / finite depth, the
+    worker js / wasm / license / og.png return 200 over the public origin, the public
+    wasm is application/wasm, and /health is {ok:true,rooms:0}; exactly one fly machine.
+  - Final domain gate (after Nil adds DNS): HTTPS cert ready and /health, app, OG
+    image, worker, and wasm load from https://ludwig.nilmamano.com.
+- Locked (do not relitigate): single fly machine, never scale past 1; engine
+  frontend-only; app slug ludwig-chess + domain ludwig.nilmamano.com (Nil-approved);
+  the exact fly-provided DNS records are parked-for-Nil; the deploy is gated on Nil's
+  about $2/month approval; no em dashes.
+- Resources: round-trip-chess/HANDOFF-DEPLOY.md (the deploy playbook this mirrors),
+  ~/nil/rps-roulette and ~/nil/wallgame (read-only deploy refs), Dockerfile /
+  fly.toml / .dockerignore / .github/workflows/fly-deploy.yml (present), fly CLI
+  ~/.fly/bin/fly (authed), gh (authed as nmamano, scopes repo + workflow).
