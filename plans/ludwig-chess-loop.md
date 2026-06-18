@@ -110,7 +110,7 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
 
 - [x] 1a Fork to standard chess (chess.js source of truth, single board, full
       rules + all draws, online 2-player, rebrand). baseline 51334dd
-- [ ] 1b Static eval-bar UI (side panel, dummy value, layout + mobile)
+- [x] 1b Static eval-bar UI (side panel, dummy value, layout + mobile). baseline 266d079
 - [ ] 1c Stockfish-WASM integration (worker, 1s/move, updating state, live
       refine, white-relative cp, mate display, evidence surface)
 - [ ] 1d Deploy to ludwig.nilmamano.com (new GitHub repo, fly app, custom
@@ -229,7 +229,78 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
 
 ## SLICE-1b PICKUP
 
-Authored after 1a commits, folding in what 1a taught (what 1a learned block at top).
+- Baseline: 266d079 (slice 1a committed; `bun run ci` 35 tests + `bun run gate:e2e`
+  14 checks both green at baseline).
+- What 1a taught (fold in):
+  - chess.js 1.4.0 API: `new Chess(fen)`; `.board()` rows run rank 8 down to rank 1,
+    cells are { square, type, color:'w'|'b' } or null; `.get(sq)` is { type, color }
+    or false; `.turn()` is 'w'|'b'; `.fen()`; `.inCheck()`; draw predicates
+    isStalemate/isThreefoldRepetition/isDrawByFiftyMoves/isInsufficientMaterial.
+  - The frontend already reconstructs `new Chess(snapshot.fen)` in
+    frontend/src/lib/chess.ts (piecesFromFen etc.); reuse it to compute a dummy
+    material eval from the FEN. white/black conversion is centralized in
+    shared/chess.ts (toColor); do not add a second converter.
+  - Debug seams exist: `window.__ludwig` (snapshot mirror), `window.__ludwigError`,
+    `window.__ludwigMove`; `window.__ludwigEval` is declared in
+    frontend/src/lib/debug.ts but not yet populated. 1b populates it.
+  - The eval bar mounts in Game.tsx beside the board: today the board sits in
+    `<div className="flex justify-center"><div className="w-full max-w-[520px]">Board</div></div>`.
+    Add the bar as a flex sibling of that inner box.
+  - The dual-client gate pattern works (channel chrome, --no-sandbox, assert on
+    `window.__ludwig`); extend it for 1b. Reserved e2e port stays 39280.
+  - Prettier mangles `__name__` in markdown: always backtick debug identifiers here.
+  - bun.lock workspace name does not auto-update on rename: edit the name field
+    directly if a future rename is needed.
+  - Reviewer rules to honor: do not advertise absent features (1b SHIPS the bar, so
+    eval-bar copy may return now); judge via the evidence surface, not pixels;
+    centralize conversions; unit-test the mapping with exact expected values.
+- Goal: a static eval bar beside the board, wired to a DUMMY eval (white-relative
+  material count derived from the FEN), with a numeric label. No Stockfish yet (1c
+  swaps the eval SOURCE only). Demoable: capture material, the bar and number shift.
+  Mobile layout stays usable (the bar is a thin vertical strip).
+- Load-bearing mechanics / traps:
+  - Pure mapping module frontend/src/lib/evalbar.ts: `evalToBar({ whiteCp?, mate? })`
+    returns { fillPct (white's share, 0..100), label, clampedCp }. Use a logistic
+    map winProb = 1 / (1 + 10^(-cp/400)) so the bar is smooth and saturates; clamp
+    fillPct to roughly [2, 98] so a side is never fully erased. mate>0 (white mates)
+    pins near 99, mate<0 near 1. Label: cp -> signed (cp/100).toFixed(1) e.g. "+1.3"
+    / "0.0" / "-0.5"; mate -> "M" + abs(n). UNIT TEST exact values + monotonicity +
+    clamping + mate + the 0 -> "0.0" / 50% case.
+  - Dummy eval source: white-relative material centipawns from the FEN
+    (P=100,N=320,B=330,R=500,Q=900, K excluded), computed via chess.js board().
+    Keep this in its own function (materialEvalCp(fen)) so 1c can replace the source
+    without touching the bar or the mapping.
+  - EvalBar component (frontend/src/components/EvalBar.tsx): a thin vertical bar; the
+    white share fills from the viewer's own side (orientation-aware: white at the
+    bottom when myColor is white, at the top when myColor is black). Show the numeric
+    label. Include an "updating" visual state driven by a prop (it will not trigger
+    in 1b since the dummy is synchronous; 1c drives it). Expose nothing new in the
+    DOM that the gate must trust; the gate reads the evidence surface.
+  - Evidence surface: populate `window.__ludwigEval` =
+    { source:'material', whiteCp, mate:null, fillPct, label } from the authoritative
+    snapshot (in App.tsx, alongside publishDebug, or a publishEval helper in debug.ts).
+    The gate asserts on this, not on bar pixels.
+  - Copy: the eval bar now exists, so re-introduce honest eval-bar copy where it
+    helps (Lobby tagline, RulesPanel, index.html/README) describing what the bar
+    does. Keep it truthful to the dummy-vs-engine distinction only if it would
+    mislead (a material bar still "shows who is winning"); engine specifics wait
+    for 1c. No em dashes.
+- Acceptance criteria:
+  - `bun run ci` green; new unit tests for evalbar mapping (exact values) and
+    materialEvalCp (start = 0; up a queen approx +900).
+  - `bun run gate:e2e`: extend with eval-bar checks judged on the evidence surface:
+    the bar element renders; `window.__ludwigEval` is populated with a numeric
+    whiteCp and fillPct in [0,100]; after a capturing line that wins material, the
+    whiteCp and fillPct move in the correct direction.
+- Decide-with-reviewer: the logistic constant / clamp bounds; bar orientation
+  (flip-with-board vs always-white-at-bottom); dummy = material vs flat 0.0; the
+  shape of `window.__ludwigEval`; the 1b gate additions.
+- Locked (do not relitigate): chess.js stays the rules authority; the engine is
+  frontend-only and arrives in 1c (1b changes only the eval SOURCE seam); judge via
+  evidence surface; single fly machine; no em dashes.
+- Resources: frontend/src/lib/chess.ts (FEN reconstruction), Game.tsx (board
+  mount point), debug.ts (`window.__ludwigEval` declaration), tests/e2e/gate.mjs
+  (extend), styles.css tokens.
 
 ## SLICE-1c PICKUP
 

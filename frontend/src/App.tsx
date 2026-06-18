@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Lobby } from "@/components/Lobby";
 import { Waiting } from "@/components/Waiting";
 import { Game } from "@/components/Game";
 import { Net, type Status } from "@/net/socket";
-import { publishDebug, publishError } from "@/lib/debug";
+import { publishDebug, publishError, publishEval, type LudwigEvalDebug } from "@/lib/debug";
+import { materialEvalCp } from "@/lib/material";
+import { evalToBar } from "@/lib/evalbar";
 import type { Square, PromotionPiece } from "@shared/chess";
 import type { PlayerId, RoomSnapshot, ServerMsg } from "@shared/protocol";
 
@@ -60,11 +62,33 @@ export function App() {
   const netRef = useRef<Net | null>(null);
   const urlRoom = roomFromUrl();
 
-  // Mirror the authoritative snapshot onto window.__ludwig (the gate's evidence
-  // surface). Diagnostic only; never read by app logic.
+  // The SINGLE eval producer. Material-derived in slice 1b; slice 1c replaces only
+  // this block (Stockfish state) without touching Game, EvalBar, or the publisher.
+  // The same object is both published to the evidence surface and passed to Game,
+  // so the visible bar and window.__ludwigEval can never diverge.
+  const evalState = useMemo<LudwigEvalDebug | null>(() => {
+    if (!snapshot) return null;
+    const cp = materialEvalCp(snapshot.fen);
+    const bar = evalToBar({ kind: "cp", whiteCp: cp });
+    return {
+      source: "material",
+      fen: snapshot.fen,
+      whiteCp: cp,
+      mate: null,
+      depth: null,
+      updating: false,
+      fillPct: bar.fillPct,
+      label: bar.label,
+    };
+  }, [snapshot]);
+
+  // Mirror the authoritative snapshot and the single derived eval onto window for
+  // the gate's evidence surface. Diagnostic only; never read by app logic. evalState
+  // is derived from the SAME snapshot.fen, so __ludwigEval.fen === __ludwig.fen.
   useEffect(() => {
     publishDebug(snapshot, you);
-  }, [snapshot, you]);
+    publishEval(evalState);
+  }, [snapshot, you, evalState]);
 
   const handleMessage = useCallback((m: ServerMsg) => {
     switch (m.t) {
@@ -187,6 +211,7 @@ export function App() {
         error={error}
         actionNonce={actionNonce}
         opponentLeft={opponentLeft}
+        evalState={evalState}
         onMove={move}
         onNewGame={newGame}
         onExit={exit}

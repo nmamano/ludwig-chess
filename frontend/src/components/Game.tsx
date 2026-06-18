@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Board } from "@/components/Board";
+import { EvalBar } from "@/components/EvalBar";
 import { PromotionPicker } from "@/components/PromotionPicker";
 import { RulesPanel } from "@/components/RulesPanel";
 import { Button } from "@/components/Button";
@@ -12,6 +13,7 @@ import {
   type Square,
 } from "@/lib/chess";
 import { cn } from "@/lib/cn";
+import type { LudwigEvalDebug } from "@/lib/debug";
 import type { Color, DrawReason, PromotionPiece } from "@shared/chess";
 import type { PlayerId, RoomSnapshot } from "@shared/protocol";
 
@@ -21,6 +23,7 @@ interface Props {
   error: string | null;
   actionNonce: number; // bumps when the server rejects an action -> clear local UI
   opponentLeft: boolean;
+  evalState: LudwigEvalDebug | null; // the single eval value, produced by App
   onMove: (from: Square, to: Square, promotion?: PromotionPiece) => void;
   onNewGame: () => void;
   onExit: () => void;
@@ -39,6 +42,7 @@ export function Game({
   error,
   actionNonce,
   opponentLeft,
+  evalState,
   onMove,
   onNewGame,
   onExit,
@@ -200,9 +204,15 @@ export function Game({
         </span>
       </div>
 
-      {/* Board */}
-      <div className="flex justify-center">
-        <div className="w-full max-w-[520px]">
+      {/* Board + material advantage bar */}
+      <div className="mx-auto flex w-full max-w-[560px] items-stretch justify-center gap-2 sm:gap-3">
+        <EvalBar
+          fillPct={evalState?.fillPct ?? 50}
+          label={evalState?.label ?? "0.0"}
+          orientation={myColor}
+          updating={evalState?.updating ?? false}
+        />
+        <div className="min-w-0 flex-1">
           <Board
             squares={squares}
             pieces={pieces}

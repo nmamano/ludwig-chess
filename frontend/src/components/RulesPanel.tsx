@@ -4,6 +4,7 @@ const RULES = [
   "Standard chess. Checkmate the opponent's king to win.",
   "Castling, en passant, and pawn promotion all work as normal.",
   "Draws: stalemate, threefold repetition, the fifty-move rule, or insufficient material.",
+  "The side bar shows the material balance, not a full engine evaluation.",
   "Share the 4-letter room code with a friend to play.",
 ];
 

@@ -1,13 +1,12 @@
 # Ludwig Chess
 
-Standard online chess, built to host one twist: a live **evaluation bar** on the
-side, powered by a Stockfish engine that runs entirely in your browser. The board,
-rules, and multiplayer ship first; the eval bar lands in a later slice (see the
-plan linked below). Once it is in, a strong move tips the bar your way and a
-blunder makes it swing, though the engine never tells you why.
+Standard online chess with a live advantage bar on the side. Today the bar shows
+the **material balance**; a full **Stockfish** evaluation that runs entirely in
+your browser is the next slice. Once the engine is in, a strong move tips the bar
+your way and a blunder makes it swing, though it never tells you why.
 
-> **Standard online chess today. The eval bar is the headline feature, coming
-> next.**
+> **Standard online chess with a material advantage bar today. A Stockfish-powered
+> evaluation is coming next.**
 
 ## Architecture
 
