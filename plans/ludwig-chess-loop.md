@@ -2,6 +2,17 @@
 
 Re-read this file at the start of every iteration. [why: conversations compact, files do not]
 
+## Completion (2026-06-19)
+
+All four slices shipped. The game is live at https://ludwig-chess.fly.dev (fly app
+ludwig-chess, one machine in sjc, single-machine in-memory state). Remote Docker
+build and the public live smoke both passed. GitHub repo nmamano/ludwig-chess
+(public, per Nil) with Actions auto-deploy on push to master. The custom domain
+ludwig.nilmamano.com is the only open item: the exact fly-provided DNS records are
+parked for Nil to add at the nilmamano.com provider, then the cert issues.
+
+Slices: 1a 266d079, 1b 43c00c3, 1c b11187d, 1d prep 707d822 + this completion.
+
 ## North star
 
 A standard online 2-player chess game at ludwig.nilmamano.com, same architecture
@@ -113,8 +124,9 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
 - [x] 1b Static eval-bar UI (side panel, dummy value, layout + mobile). baseline 266d079
 - [x] 1c Stockfish-WASM integration (worker, 1s/move, updating state, live
       refine, white-relative cp, mate display, evidence surface). baseline 43c00c3
-- [ ] 1d Deploy to ludwig.nilmamano.com (new GitHub repo, fly app, custom
-      domain, OG tags)
+- [x] 1d Deploy: live at https://ludwig-chess.fly.dev (fly app ludwig-chess, one
+      machine, sjc). Repo public per Nil. Custom domain ludwig.nilmamano.com pending
+      the parked DNS records. baseline 707d822
 - [ ] OPT numeric/mate edge polish
 - [ ] OPT eval history sparkline
 - [ ] OPT multi-threaded engine upgrade (needs COOP/COEP headers)
