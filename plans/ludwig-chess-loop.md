@@ -4,14 +4,16 @@ Re-read this file at the start of every iteration. [why: conversations compact, 
 
 ## Completion (2026-06-19)
 
-All four slices shipped. The game is live at https://ludwig-chess.fly.dev (fly app
-ludwig-chess, one machine in sjc, single-machine in-memory state). Remote Docker
-build and the public live smoke both passed. GitHub repo nmamano/ludwig-chess
-(public, per Nil) with Actions auto-deploy on push to master. The custom domain
-ludwig.nilmamano.com is the only open item: the exact fly-provided DNS records are
-parked for Nil to add at the nilmamano.com provider, then the cert issues.
+All four slices shipped and the project is COMPLETE. The game is live at
+https://ludwig-chess.fly.dev AND https://ludwig.nilmamano.com (fly app ludwig-chess,
+one machine in sjc, single-machine in-memory state). Nil added the DNS records and
+the Let's Encrypt cert issued (verified and active); /health, the app, the OG card,
+and the engine wasm all load over HTTPS on the custom domain. Remote Docker build
+and the public live smoke both passed. GitHub repo nmamano/ludwig-chess (public)
+with Actions auto-deploy on push to master.
 
-Slices: 1a 266d079, 1b 43c00c3, 1c b11187d, 1d prep 707d822 + this completion.
+Slices: 1a 266d079, 1b 43c00c3, 1c b11187d, 1d prep 707d822 + completions.
+No open items.
 
 ## North star
 
@@ -134,16 +136,11 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
 
 ## Deferred / parked
 
-- parked-for-Nil: approve the about $2/month fly machine for ludwig-chess (or confirm
-  a legacy free allowance) before any `fly apps create` / `fly deploy`. Reconciles
-  standing rail 5 ($0); the deploy is the one approved exception, pending Nil.
-- parked-for-Nil: flip the GitHub repo to public (default is private).
-- parked-for-Nil: add these EXACT fly-provided DNS records for ludwig.nilmamano.com
-  at the nilmamano.com DNS provider (I lack provider access), then the cert issues:
-  - A ludwig.nilmamano.com -> 66.241.124.149
-  - AAAA ludwig.nilmamano.com -> 2a09:8280:1::12e:7f28:0
-    Cert added 2026-06-19 (status: awaiting DNS). Verify with
-    `fly certs check ludwig.nilmamano.com`.
+- DONE 2026-06-19: Nil approved the about $2/month fly machine; ludwig-chess deployed.
+- DONE 2026-06-19: GitHub repo created public (Nil chose public).
+- DONE 2026-06-19: Nil added the DNS records (A -> 66.241.124.149, AAAA ->
+  2a09:8280:1::12e:7f28:0); the Let's Encrypt cert issued and ludwig.nilmamano.com
+  is live over HTTPS.
 - note: stockfish.js is GPLv3, loaded as a separate UCI worker (not statically
   linked). Add a visible credits/source link in the UI. Flag to Nil if the repo
   license needs to be reconciled.
