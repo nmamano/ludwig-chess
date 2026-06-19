@@ -138,9 +138,12 @@ default is 3000 via PORT env. Never reuse or clobber a live/dev instance.
   a legacy free allowance) before any `fly apps create` / `fly deploy`. Reconciles
   standing rail 5 ($0); the deploy is the one approved exception, pending Nil.
 - parked-for-Nil: flip the GitHub repo to public (default is private).
-- parked-for-Nil: add the EXACT fly-provided DNS records for ludwig.nilmamano.com
-  (captured from `fly certs add`, not inferred from chess.nilmamano.com) at the
-  nilmamano.com DNS provider (slice 1d; I lack provider access).
+- parked-for-Nil: add these EXACT fly-provided DNS records for ludwig.nilmamano.com
+  at the nilmamano.com DNS provider (I lack provider access), then the cert issues:
+  - A ludwig.nilmamano.com -> 66.241.124.149
+  - AAAA ludwig.nilmamano.com -> 2a09:8280:1::12e:7f28:0
+    Cert added 2026-06-19 (status: awaiting DNS). Verify with
+    `fly certs check ludwig.nilmamano.com`.
 - note: stockfish.js is GPLv3, loaded as a separate UCI worker (not statically
   linked). Add a visible credits/source link in the UI. Flag to Nil if the repo
   license needs to be reconciled.
