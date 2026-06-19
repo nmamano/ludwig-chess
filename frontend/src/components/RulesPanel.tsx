@@ -1,11 +1,8 @@
 // Rules copy for Ludwig chess: standard online chess with a live engine eval bar.
 
 const RULES = [
-  "Standard chess. Checkmate the opponent's king to win.",
-  "Castling, en passant, and pawn promotion all work as normal.",
-  "Draws: stalemate, threefold repetition, the fifty-move rule, or insufficient material.",
+  "Standard chess.",
   "The side bar is a live Stockfish evaluation: a blunder makes it swing, but it never tells you why.",
-  "Share the 4-letter room code with a friend to play.",
 ];
 
 export function RulesPanel() {
