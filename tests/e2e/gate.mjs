@@ -10,7 +10,7 @@
 // Run with: bun run gate:e2e  (which builds the frontend, copying the engine).
 
 import { chromium } from "playwright-core";
-import app from "../../server/index.ts";
+import { handlers as app } from "../../server/index.ts";
 
 const PORT = 39280;
 const BASE = `http://localhost:${PORT}`;
