@@ -1,9 +1,9 @@
 // Non-docker production gate. Proves a CLEAN build regenerates the engine assets
 // from installed deps (not inherited local files), then serves the production build
-// (the same `bun run start` the container runs) and asserts the engine assets +
+// (the same server/index.ts the container runs) and asserts the engine assets +
 // /health are served correctly: 200, nonzero length, and application/wasm for the
 // wasm. This is the local substitute where the docker daemon is unavailable; the
-// fly --remote-only build exercises the actual Dockerfile at deploy time.
+// CI image build (.github/workflows/image.yml) exercises the actual Dockerfile.
 //
 // Run with: bun scripts/gate-prod.mjs
 

@@ -17,7 +17,8 @@ Real-time, two-player, no-login online multiplayer:
 - **Engine:** single-threaded Stockfish-WASM (Stockfish.js, GPLv3) in a Web Worker,
   client-side only. Assets are copied from the npm package at dev/build time (see
   scripts/copy-engine.mjs), not committed.
-- **Deploy:** fly.io, a single machine (in-memory state, never scale past one).
+- **Deploy:** one container on the shared VPS at ludwig.nilmamano.com; GitHub Actions
+  builds the image (`.github/workflows/image.yml`). One process only (in-memory state).
 
 Architecture and conventions mirror the round-trip-chess / rps-roulette projects.
 

@@ -1,5 +1,6 @@
 // Hono app: WS upgrade, static serving of the built frontend, listen on PORT or SITE_SOCKET.
-// In-memory state only (see fly.toml): this MUST run on exactly one machine.
+// In-memory state only: this MUST run as exactly one process. A second one would hold
+// a separate room store, so two players on different processes could never meet.
 
 import { chmodSync, rmSync } from "node:fs";
 import { Hono } from "hono";
@@ -23,7 +24,7 @@ const websocket = registerSocket(app, store);
 app.get("/health", (c) => c.json({ ok: true, rooms: store.size }));
 
 // Serve the Stockfish wasm worker asset with the correct MIME so the browser can
-// stream-compile it and the content-type is unambiguous behind fly's proxy. Runs
+// stream-compile it and the content-type is unambiguous behind the reverse proxy. Runs
 // before the static catch-all and fixes the header after the file is served.
 app.use("/engine/*", async (c, next) => {
   await next();

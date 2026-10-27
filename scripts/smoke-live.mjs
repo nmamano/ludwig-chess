@@ -3,11 +3,11 @@
 // is per-client, dual-client is covered locally). Also verifies the worker JS / wasm
 // / license return 200 over the public origin and /health is healthy.
 //
-// Run with: bun scripts/smoke-live.mjs https://ludwig-chess.fly.dev
+// Run with: bun scripts/smoke-live.mjs https://ludwig.nilmamano.com
 
 import { chromium } from "playwright-core";
 
-const BASE = (process.argv[2] || process.env.LUDWIG_URL || "https://ludwig-chess.fly.dev").replace(
+const BASE = (process.argv[2] || process.env.LUDWIG_URL || "https://ludwig.nilmamano.com").replace(
   /\/$/,
   "",
 );

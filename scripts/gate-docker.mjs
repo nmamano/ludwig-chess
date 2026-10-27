@@ -1,7 +1,7 @@
 // Local pre-deploy gate: build the production Docker image from a CLEAN context
 // (frontend/public/engine is dockerignored, so the image must regenerate the engine
 // assets from installed deps via copy-engine) and smoke the running container. This
-// catches Docker / engine-packaging issues before spending a fly deploy.
+// catches Docker / engine-packaging issues before a push builds the image.
 //
 // Run with: bun scripts/gate-docker.mjs   (requires docker)
 
